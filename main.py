@@ -3,20 +3,25 @@
 import driver
 import exporter
 import multiprocessing
+import numpy as np
+import ctypes
 
 
 def main():
     end_event = multiprocessing.Event()
+    biggest_person_pixels = multiprocessing.Value(ctypes.c_float, 0)
+    found_bottle = multiprocessing.Value(ctypes.c_bool, False)
     exporter_process = multiprocessing.Process(
-        target=exporter.run_model_export_video_data, args=(end_event,)
+        target=exporter.run_model_export_video_data,
+        args=(end_event, biggest_person_pixels, found_bottle),
     )
 
-    drone_instructions = [("forward", 50)]
+    drone_instructions = [("forward", 25)] * 20
 
     exporter_process.start()
 
     try:
-        driver.do_patrol(drone_instructions)
+        driver.do_patrol(drone_instructions, 15, biggest_person_pixels, found_bottle)
     except driver.DroneConnectionError as e:
         print(e)
 

@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 
+from torch import dist
 import tvm
+import numpy.typing as npt
+from skimage.measure import find_contours
 from tvm.contrib.graph_executor import GraphModule
 import numpy as np
 import cv2
@@ -33,7 +36,25 @@ def prepare_model(lib_path) -> GraphModule:
     return graph
 
 
-def run_model_export_video_data(event):
+def find_biggest_person(raw_prediction: npt.NDArray) -> float:
+    """
+    Given an array of class predictions, return the biggest person
+    """
+    if 15 not in raw_prediction:
+        return 0
+
+    person_predictions = raw_prediction.copy()
+    person_predictions[person_predictions != 15] = 0
+    contours = find_contours(person_predictions)
+    return max(
+        [
+            cv2.contourArea(cv2.UMat(np.expand_dims(contour.astype(np.float32), 1)))
+            for contour in contours
+        ]
+    )
+
+
+def run_model_export_video_data(event, biggest_person_pixels, found_bottle):
     model = prepare_model(MODEL_FILE_NAME)
     video_stream = cv2.VideoCapture(0)
 
@@ -46,8 +67,15 @@ def run_model_export_video_data(event):
             model.set_input(MODEL_INPUT_NAME, image_tvm_array)
             model.run()
             raw_prediction = model.get_output(0).numpy()[0]
-            video_data.append(frame)
-            video_data.append(raw_prediction)
+            # video_data.append(frame)
+            # video_data.append(raw_prediction)
+            class_predictions = raw_prediction.argmax(0)
+            biggest_person_value = find_biggest_person(class_predictions)
+            # bottle_value = np.bincount(class_predictions.flatten())[5]
+            with biggest_person_pixels.get_lock():
+                biggest_person_pixels.value = biggest_person_value
+            with found_bottle.get_lock():
+                found_bottle.value = 5 in class_predictions
 
     video_stream.release()
 
