@@ -2,6 +2,7 @@
 
 import tvm
 import pickle
+import time
 import multiprocessing
 import numpy.typing as npt
 from skimage.measure import find_contours
@@ -11,8 +12,8 @@ import cv2
 import torchvision
 
 MODEL_INPUT_NAME = "input0"
-MODEL_FILE_NAME = "lib.tar"
-IMAGE_SIZE = 224
+MODEL_FILE_NAME = "lib284.tar"
+IMAGE_SIZE = 284
 
 TRANSFORM = torchvision.transforms.Compose(
     [
@@ -58,38 +59,24 @@ def find_biggest_person(raw_prediction: npt.NDArray) -> float:
 
 def run_model_export_video_data(
     event: multiprocessing.Event,
-    biggest_person_pixels: multiprocessing.Value,
-    found_bottle: multiprocessing.Value,
-    new_frame_received: multiprocessing.Condition,
 ):
     model = prepare_model(MODEL_FILE_NAME)
     video_stream = cv2.VideoCapture(0)
 
     video_data = []
     video_dump_file = open("video_data.dump", "wb")
+    fps_values = []
 
     frames_passed = 0
     while not event.is_set():
+        start = time.time()
         ret, frame = video_stream.read()
         if ret:
             image_tvm_array = prepare_image(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
             model.set_input(MODEL_INPUT_NAME, image_tvm_array)
             model.run()
             raw_prediction = model.get_output(0).numpy()[0]
-            # video_data.append(frame)
-            # video_data.append(raw_prediction)
             class_predictions = raw_prediction.argmax(0)
-            biggest_person_value = find_biggest_person(class_predictions)
-            # bottle_value = np.bincount(class_predictions.flatten())[5]
-            # with biggest_person_pixels.get_lock():
-            #    biggest_person_pixels.value = biggest_person_value
-            with new_frame_received:
-                new_frame_received.notify()
-
-            if not found_bottle.value:
-                with found_bottle.get_lock():
-                    found_bottle.value = 5 in class_predictions
-
             video_data.append(
                 (frame.astype("uint8"), class_predictions.astype("uint8"))
             )
@@ -99,9 +86,12 @@ def run_model_export_video_data(
                 frames_passed = 0
             else:
                 frames_passed += 1
+        fps_values.append(1 / (time.time() - start))
 
     if video_data:
         pickle.dump(video_data, video_dump_file)
 
     video_stream.release()
     video_dump_file.close()
+    with open("avg_fps", "w") as f:
+        f.write(str(np.array(fps_values).mean()))

@@ -9,25 +9,25 @@ import argparse
 from PIL import Image
 
 PI_CAMERA_RES = {"width": 640, "height": 480, "dim": 3}
-SEG_RES = (224, 224)
 COLOR_PALETTE = torch.tensor([2**25 - 1, 2**15 - 1, 2**21 - 1])
 colors = torch.as_tensor([i for i in range(21)])[:, None] * COLOR_PALETTE
 colors = (colors % 255).numpy().astype("uint8")
 
 
-def get_args() -> tuple[str, str]:
+def get_args() -> tuple[str, str, int]:
     parser = argparse.ArgumentParser(
         description="Converts a pickled video file with the format [(raw_image_array, image_seg_array)] to a mp4 video",
         allow_abbrev=False,
     )
 
+    parser.add_argument("--seg_size", type=int, default=224)
     parser.add_argument("pickled_file", type=str)
     parser.add_argument("out_video_file", type=str)
     args = parser.parse_args()
 
     assert args.out_video_file.endswith(".mp4"), "Expected out mp4 file"
 
-    return args.pickled_file, args.out_video_file
+    return args.pickled_file, args.out_video_file, args.seg_size
 
 
 def get_colored_seg_image(image_seg_arr: npt.NDArray) -> Image.Image:
@@ -37,27 +37,29 @@ def get_colored_seg_image(image_seg_arr: npt.NDArray) -> Image.Image:
 
 
 def main():
-    pickled_file_path, out_video_file = get_args()
+    pickled_file_path, out_video_file, seg_size = get_args()
+    seg_res = (seg_size, seg_size)
 
     frames = []
     with open(pickled_file_path, "rb") as pickle_file:
         while True:
             try:
                 frames += pickle.load(pickle_file)
-            except EOFError:
+            except (EOFError, pickle.UnpicklingError):
                 break
 
+    print([(i.shape, j.shape) for i, j in frames])
     assert all(
         raw_image.shape
         == (PI_CAMERA_RES["height"], PI_CAMERA_RES["width"], PI_CAMERA_RES["dim"])
-        and seg_image.shape == SEG_RES
+        and seg_image.shape == seg_res
         for raw_image, seg_image in frames
-    ), f"Expected raw image to be of dimension {PI_CAMERA_RES['width']}x{PI_CAMERA_RES['height']} and segmentation image to be of dimension {SEG_RES['width']}x{SEG_RES['height']}"
+    ), f"Expected raw image to be of dimension {PI_CAMERA_RES['width']}x{PI_CAMERA_RES['height']} and segmentation image to be of dimension {seg_res[0]}x{seg_res[1]}"
 
     video_writer = cv2.VideoWriter(
         out_video_file,
         cv2.VideoWriter_fourcc(*"mp4v"),
-        1,
+        2,
         (PI_CAMERA_RES["width"] * 2, PI_CAMERA_RES["height"]),
     )
 
