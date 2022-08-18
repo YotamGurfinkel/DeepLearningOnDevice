@@ -29,7 +29,7 @@ def try_connect(t: Tello, timeout_seconds: int):
     raise DroneConnectionError
 
 
-def got_person_distance(person_pixels: float, distance_meters: int):
+def got_person_distance(person_pixels: int, distance_meters: int):
     if person_pixels == 0:
         return False
 
@@ -41,6 +41,7 @@ def do_patrol(
     drone_speed: int,
     biggest_person_pixels: multiprocessing.Value,
     found_bottle: multiprocessing.Value,
+    new_frame_received: multiprocessing.Condition,
 ):
     assert all(
         direction in POSSIBLE_DIRECTIONS for direction, _ in instructions
@@ -59,11 +60,15 @@ def do_patrol(
     wake_drone = True
     switch_direction = False
     got_person = True
-    for instruction in instructions:
+    for command, amount in instructions:
         if wake_drone:
-            t.send_command_with_return("command")
+            t.send_control_command("command")
             wake_drone = False
             time.sleep(2)
+
+        # Wait for a new frame to arrive for each person check
+        with new_frame_received:
+            new_frame_received.wait()
 
         while got_person_distance(biggest_person_pixels.value, 200):
             got_person = True
@@ -72,11 +77,14 @@ def do_patrol(
             else:
                 t.move_left(40)
 
+            with new_frame_received:
+                new_frame_received.wait()
+
         if got_person:
             switch_direction = not switch_direction
             got_person = False
 
-        t.move(*instruction)
+        getattr(t, command)(amount)
 
         if found_bottle.value:
             t.rotate_clockwise(360)
