@@ -1,8 +1,8 @@
 # DeepLearning-ondevice
 
-Running a trained Neural Network on a Raspberry Pi Zero
+Running Semantic Segmentation Neural Networks on a Raspberry Pi Zero V2
 
-Steps to make it happen:
+## Project Structure:
 
-1. Got pytorch and pytorch-vision wheels from this git repo: https://github.com/isakbosman/pytorch_arm_builds
-2. Compiled python3.7 for Raspberry Pi, required to install wheels compiled for this version
+- `nets/` - all neural networks that we used in this project, along with their sources and scripts we used to measure their accuracy etc.
+- `on_rpi/` - scripts that run on the Raspberry Pi itself
