@@ -39,18 +39,17 @@ def do_patrol(
     assert 0 <= drone_speed <= 100, "Expected drone speed to be between 0-100"
 
     try_connect(t, 60)
+    time.sleep(2)
     t.set_speed(drone_speed)
     time.sleep(2)
 
     t.takeoff()
-    time.sleep(2)
-    wake_drone = True
-    for command, amount in instructions:
-        if wake_drone:
-            t.send_control_command("command")
-            wake_drone = False
-            time.sleep(2)
+    time.sleep(4)
 
+    t.send_control_command("command")
+    time.sleep(2)
+
+    for command, amount in instructions:
         getattr(t, command)(amount)
         if command in ["rotate_clockwise", "rotate_counterclockwise"]:
             time.sleep(2)

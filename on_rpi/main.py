@@ -3,29 +3,25 @@
 import driver
 import exporter
 import multiprocessing
+import sys
+
+
+def parse_instructions(file_name: str) -> list[tuple[str, int]]:
+    with open(file_name) as f:
+        return [(line.split()[0], int(line.split()[1])) for line in f.readlines()]
 
 
 def main():
+    if len(sys.argv) < 2:
+        print("USAGE: python main.py NAME_OF_TRACK_FILE")
+        exit(1)
+
+    drone_instructions = parse_instructions(sys.argv[1])
     end_event = multiprocessing.Event()
     exporter_process = multiprocessing.Process(
         target=exporter.run_model_export_video_data,
         args=(end_event,),
     )
-
-    drone_instructions = [
-        ("move_forward", 313),
-        ("rotate_clockwise", 90),
-        ("move_forward", 233),
-        ("move_forward", 232),
-        ("rotate_clockwise", 180),
-        ("move_forward", 266),
-        ("rotate_clockwise", 90),
-        ("move_forward", 249),
-        ("rotate_clockwise", 90),
-        ("move_forward", 187),
-        ("rotate_clockwise", 180),
-        ("move_forward", 187),
-    ]
 
     exporter_process.start()
 

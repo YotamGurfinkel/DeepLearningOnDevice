@@ -9,11 +9,15 @@ from skimage.measure import find_contours
 from tvm.contrib.graph_executor import GraphModule
 import numpy as np
 import cv2
+import RPi.GPIO as GPIO
 import torchvision
 
 MODEL_INPUT_NAME = "input0"
 MODEL_FILE_NAME = "lib284.tar"
 IMAGE_SIZE = 284
+GPIO_LED_PORT = 4
+PERSON_THRESHOLD = 3000
+USE_LED = False
 
 TRANSFORM = torchvision.transforms.Compose(
     [
@@ -57,9 +61,17 @@ def find_biggest_person(raw_prediction: npt.NDArray) -> float:
     )
 
 
+def prepare_led():
+    GPIO.setmode(GPIO.BCM)
+    GPIO.setwarnings(False)
+    GPIO.setup(GPIO_LED_PORT, GPIO.OUT)
+
+
 def run_model_export_video_data(
     event: multiprocessing.Event,
 ):
+    if USE_LED:
+        prepare_led()
     model = prepare_model(MODEL_FILE_NAME)
     video_stream = cv2.VideoCapture(0)
 
@@ -69,14 +81,24 @@ def run_model_export_video_data(
 
     frames_passed = 0
     while not event.is_set():
-        start = time.time()
         ret, frame = video_stream.read()
         if ret:
+            start = time.time()
             image_tvm_array = prepare_image(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
             model.set_input(MODEL_INPUT_NAME, image_tvm_array)
             model.run()
             raw_prediction = model.get_output(0).numpy()[0]
             class_predictions = raw_prediction.argmax(0)
+
+            if USE_LED:
+                GPIO.output(
+                    GPIO_LED_PORT,
+                    GPIO.HIGH
+                    if 15 in class_predictions
+                    and np.bincount(class_predictions.flatten())[15] > PERSON_THRESHOLD
+                    else GPIO.LOW,
+                )
+
             video_data.append(
                 (frame.astype("uint8"), class_predictions.astype("uint8"))
             )
@@ -86,10 +108,14 @@ def run_model_export_video_data(
                 frames_passed = 0
             else:
                 frames_passed += 1
-        fps_values.append(1 / (time.time() - start))
+
+            fps_values.append(1 / (time.time() - start))
 
     if video_data:
         pickle.dump(video_data, video_dump_file)
+
+    if USE_LED:
+        GPIO.output(GPIO_LED_PORT, GPIO.LOW)
 
     video_stream.release()
     video_dump_file.close()
