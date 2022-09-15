@@ -1,4 +1,4 @@
-# DeepLearning-ondevice
+# DeepLearningOnDevice
 
 Running Semantic Segmentation Neural Networks on a Raspberry Pi Zero V2
 
