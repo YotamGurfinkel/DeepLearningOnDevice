@@ -4,7 +4,7 @@ These are checkpoints for networks that were compressed using [torchprune](https
 
 For retraining and training we used recipes (optimizers, schedulers etc.) obtained from this repo <https://github.com/clovaai/frostnet>. These were baked into `torchprune`.
 
-The compressing procedure was cascade, which retrained and compressed the network for 10 iterations using these compression ratios:
+The compressing procedure was cascade, which retrained and compressed the network for 10 iterations using these keep ratios:
 
 ```python
 np.geomspace(0.12, 0.85, 10)
@@ -14,4 +14,4 @@ np.geomspace(0.12, 0.85, 10)
 
 ### Loading the compressed network using a checkpoint
 
-To load a provided checkpoint, install the `torchprune` package, then run the `get_network.py` script.
+To load a provided checkpoint, install the `torchprune` package, then the process of loading a network is shown in `get_network.py`
